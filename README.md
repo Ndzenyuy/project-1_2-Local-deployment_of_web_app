@@ -1,5 +1,5 @@
 # Project-#1 & #2: vprofile manual and automated provisionning on local machine
-  This project sets up a web app in on a local machine using vagrant to configure the differnt servers on Virtualbox, these VMs interrract with each other via HTTP protocole. 
+  This project sets up a web app in on a local machine using vagrant to configure the differnt servers on Virtualbox, these VMs interrract with each other via HTTP protocole. User login to the site, their credentials are stored in the MySql database, the each time any data is sought from the data base, a copy is cached in memcached offload the database from being overwhelmed with many reads, thus optimising data reads. RabbitMq is used to couple between the services.
   ## Services involved: 
   - Tomcat
   - Nginix
