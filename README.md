@@ -280,7 +280,7 @@ Restart Nginx
 - MySQL
 
 # Results
-![Login](https://github.com/Ndzenyuy/vprofile-project/blob/main/images/Screenshot%20from%202023-07-10%2016-23-33.png)  
+![Login](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-23-33.png)  
 ![Home page](https://github.com/Ndzenyuy/vprofile-project/blob/main/images/Screenshot%20from%202023-07-10%2016-25-20.png)
 
 
