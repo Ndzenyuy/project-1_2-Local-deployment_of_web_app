@@ -528,6 +528,9 @@ We also need to have in the same folder the files: nginx.sh, rabitmq.sh, memcach
 # Results
 ![Login](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-23-33.png)  
 ![Home page](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-25-20.png)
+![](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-26-26.png)
+![](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-27-03.png)
+![](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-43-00.png)
 
 
 
