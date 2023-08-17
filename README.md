@@ -269,6 +269,252 @@ Restart Nginx
 
   ## Automated provisionning
   Using bash scripting, the setup was configured for automatic configuration and installations
+  ### Step 1: Bash scripts
+  Creat a new folder called Automated_provisionning
+  Create a file Vagrantfile with the following: 
+  ```
+Vagrant.configure("2") do |config|
+  config.hostmanager.enabled = true 
+  config.hostmanager.manage_host = true
+  
+### DB vm  ####
+  config.vm.define "db01" do |db01|
+    db01.vm.box = "eurolinux-vagrant/centos-stream-9"
+    db01.vm.hostname = "db01"
+    db01.vm.network "private_network", ip: "192.168.56.15"
+    db01.vm.provider "virtualbox" do |vb|
+     vb.memory = "600"
+   end
+    db01.vm.provision "shell", path: "mysql.sh"  
+
+  end
+  
+### Memcache vm  #### 
+  config.vm.define "mc01" do |mc01|
+    mc01.vm.box = "eurolinux-vagrant/centos-stream-9"
+    mc01.vm.hostname = "mc01"
+    mc01.vm.network "private_network", ip: "192.168.56.14"
+    mc01.vm.provider "virtualbox" do |vb|
+     vb.memory = "600"
+   end
+    mc01.vm.provision "shell", path: "memcache.sh"  
+  end
+  
+### RabbitMQ vm  ####
+  config.vm.define "rmq01" do |rmq01|
+    rmq01.vm.box = "eurolinux-vagrant/centos-stream-9"
+  rmq01.vm.hostname = "rmq01"
+    rmq01.vm.network "private_network", ip: "192.168.56.16"
+    rmq01.vm.provider "virtualbox" do |vb|
+     vb.memory = "600"
+   end
+    rmq01.vm.provision "shell", path: "rabbitmq.sh"  
+  end
+  
+### tomcat vm ###
+   config.vm.define "app01" do |app01|
+    app01.vm.box = "eurolinux-vagrant/centos-stream-9"
+    app01.vm.hostname = "app01"
+    app01.vm.network "private_network", ip: "192.168.56.12"
+    app01.vm.provision "shell", path: "tomcat.sh"  
+    app01.vm.provider "virtualbox" do |vb|
+     vb.memory = "800"
+   end
+   end
+   
+  
+### Nginx VM ###
+  config.vm.define "web01" do |web01|
+    web01.vm.box = "ubuntu/jammy64"
+    web01.vm.hostname = "web01"
+  web01.vm.network "private_network", ip: "192.168.56.11"
+#  web01.vm.network "public_network"
+  web01.vm.provider "virtualbox" do |vb|
+     vb.gui = true
+     vb.memory = "800"
+   end
+  web01.vm.provision "shell", path: "nginx.sh"  
+end
+  
+end
+```
+We also need to have in the same folder the files: nginx.sh, rabitmq.sh, memcache.sh, mysql.sh and tomcat.sh with the following contents
+- File 1: memcache.sh
+  ```
+  #!/bin/bash
+  sudo dnf install epel-release -y
+  sudo dnf install memcached -y
+  sudo systemctl start memcached
+  sudo systemctl enable memcached
+  sudo systemctl status memcached
+  sed -i 's/127.0.0.1/0.0.0.0/g' /etc/sysconfig/memcached
+  sudo systemctl restart memcached
+  firewall-cmd --add-port=11211/tcp
+  firewall-cmd --runtime-to-permanent
+  firewall-cmd --add-port=11111/udp
+  firewall-cmd --runtime-to-permanent
+  sudo memcached -p 11211 -U 11111 -u memcached -d
+  ```
+- File 2: tomcat.sh
+  ```
+  TOMURL="https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.75/bin/apache-tomcat-9.0.75.tar.gz"
+  dnf -y install java-11-openjdk java-11-openjdk-devel
+  dnf install git maven wget -y
+  cd /tmp/
+  wget $TOMURL -O tomcatbin.tar.gz
+  EXTOUT=`tar xzvf tomcatbin.tar.gz`
+  TOMDIR=`echo $EXTOUT | cut -d '/' -f1`
+  useradd --shell /sbin/nologin tomcat
+  rsync -avzh /tmp/$TOMDIR/ /usr/local/tomcat/
+  chown -R tomcat.tomcat /usr/local/tomcat
+  
+  rm -rf /etc/systemd/system/tomcat.service
+  
+  cat <<EOT>> /etc/systemd/system/tomcat.service
+  [Unit]
+  Description=Tomcat
+  After=network.target
+  
+  [Service]
+  
+  User=tomcat
+  Group=tomcat
+  
+  WorkingDirectory=/usr/local/tomcat
+  
+  #Environment=JRE_HOME=/usr/lib/jvm/jre
+  Environment=JAVA_HOME=/usr/lib/jvm/jre
+  
+  Environment=CATALINA_PID=/var/tomcat/%i/run/tomcat.pid
+  Environment=CATALINA_HOME=/usr/local/tomcat
+  Environment=CATALINE_BASE=/usr/local/tomcat
+  
+  ExecStart=/usr/local/tomcat/bin/catalina.sh run
+  ExecStop=/usr/local/tomcat/bin/shutdown.sh
+  
+  
+  RestartSec=10
+  Restart=always
+  
+  [Install]
+  WantedBy=multi-user.target
+  
+  EOT
+  
+  systemctl daemon-reload
+  systemctl start tomcat
+  systemctl enable tomcat
+  
+  git clone -b main https://github.com/devopshydclub/vprofile-project.git
+  cd vprofile-project
+  mvn install
+  systemctl stop tomcat
+  sleep 20
+  rm -rf /usr/local/tomcat/webapps/ROOT*
+  cp target/vprofile-v2.war /usr/local/tomcat/webapps/ROOT.war
+  systemctl start tomcat
+  sleep 20
+  systemctl stop firewalld
+  systemctl disable firewalld
+  #cp /vagrant/application.properties /usr/local/tomcat/webapps/ROOT/WEB-INF/classes/application.properties
+  systemctl restart tomcat
+  ```
+- File 3: rabbitmq.sh
+  ```
+  #!/bin/bash
+  sudo yum install epel-release -y
+  sudo yum update -y
+  sudo yum install wget -y
+  cd /tmp/
+  dnf -y install centos-release-rabbitmq-38
+   dnf --enablerepo=centos-rabbitmq-38 -y install rabbitmq-server
+   systemctl enable --now rabbitmq-server
+   firewall-cmd --add-port=5672/tcp
+   firewall-cmd --runtime-to-permanent
+  sudo systemctl start rabbitmq-server
+  sudo systemctl enable rabbitmq-server
+  sudo systemctl status rabbitmq-server
+  sudo sh -c 'echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config'
+  sudo rabbitmqctl add_user test test
+  sudo rabbitmqctl set_user_tags test administrator
+  sudo systemctl restart rabbitmq-server
+  ```
+- File 4: mysql.sh
+  ```
+  #!/bin/bash
+  DATABASE_PASS='admin123'
+  sudo yum update -y
+  sudo yum install epel-release -y
+  sudo yum install git zip unzip -y
+  sudo yum install mariadb-server -y
+  
+  
+  # starting & enabling mariadb-server
+  sudo systemctl start mariadb
+  sudo systemctl enable mariadb
+  cd /tmp/
+  git clone -b main https://github.com/devopshydclub/vprofile-project.git
+  #restore the dump file for the application
+  sudo mysqladmin -u root password "$DATABASE_PASS"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
+  sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'%' identified by 'admin123'"
+  sudo mysql -u root -p"$DATABASE_PASS" accounts < /tmp/vprofile-project/src/main/resources/db_backup.sql
+  sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+  
+  # Restart mariadb-server
+  sudo systemctl restart mariadb
+  
+  
+  #starting the firewall and allowing the mariadb to access from port no. 3306
+  sudo systemctl start firewalld
+  sudo systemctl enable firewalld
+  sudo firewall-cmd --get-active-zones
+  sudo firewall-cmd --zone=public --add-port=3306/tcp --permanent
+  sudo firewall-cmd --reload
+  sudo systemctl restart mariadb
+  ```
+- File 5: nginx.sh
+  ```
+  # adding repository and installing nginx		
+  apt update
+  apt install nginx -y
+  cat <<EOT > vproapp
+  upstream vproapp {
+  
+   server app01:8080;
+  
+  }
+  
+  server {
+  
+    listen 80;
+  
+  location / {
+  
+    proxy_pass http://vproapp;
+  
+  }
+  
+  }
+  
+  EOT
+  
+  mv vproapp /etc/nginx/sites-available/vproapp
+  rm -rf /etc/nginx/sites-enabled/default
+  ln -s /etc/nginx/sites-available/vproapp /etc/nginx/sites-enabled/vproapp
+  
+  #starting nginx service and firewall
+  systemctl start nginx
+  systemctl enable nginx
+  systemctl restart nginx
+  ```
+  
   
 
 ## Technologies 
@@ -281,7 +527,7 @@ Restart Nginx
 
 # Results
 ![Login](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-23-33.png)  
-![Home page](https://github.com/Ndzenyuy/vprofile-project/blob/main/images/Screenshot%20from%202023-07-10%2016-25-20.png)
+![Home page](https://github.com/Ndzenyuy/project-1_2-Local-deployment_of_web_app/blob/main/images/Screenshot%20from%202023-07-10%2016-25-20.png)
 
 
 
