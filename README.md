@@ -252,7 +252,7 @@ Create Nginx conf file with below content
     location / {
     proxy_pass http://vproapp;
     }
-    }
+    } 
     
 Remove default nginx conf
 ```
